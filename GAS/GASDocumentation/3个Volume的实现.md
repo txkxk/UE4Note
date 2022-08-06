@@ -85,3 +85,7 @@ void UGDDamageExecCalculation::Execute_Implementation(const FGameplayEffectCusto
 在获取到OutExecutionOuput之后，遍历这个这个结构体的Modifiers，对生命的Attribute进行修改
 
 ![代码](image/6.png)
+
+在InternalExecuteMod真正对Attribute进行修改时，会调用AttributeSet::PreGameplayEffectExecute和AttributeSet::PostGameplayEffectExecute。这两个函数都可以进行重写。在这个项目里，UGDAttributeSetBase重写了这两个方法，在UGDAttributeSetBase::PostGameplayEffectExecute函数里用生命值减去伤害值，到这里才是真正应用到了Damage的值来对角色造成伤害。
+
+![代码](image/7.png)
