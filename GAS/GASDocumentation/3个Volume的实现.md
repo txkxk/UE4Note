@@ -32,49 +32,49 @@ GE的类型是Instant(即刻)，没有配置Modifiers，在Executions配置了UG
 ```cpp
 void UGDDamageExecCalculation::Execute_Implementation(const FGameplayEffectCustomExecutionParameters & ExecutionParams, OUT FGameplayEffectCustomExecutionOutput & OutExecutionOutput) const
 {
-	UAbilitySystemComponent* TargetAbilitySystemComponent = ExecutionParams.GetTargetAbilitySystemComponent();
-	UAbilitySystemComponent* SourceAbilitySystemComponent = ExecutionParams.GetSourceAbilitySystemComponent();
+    UAbilitySystemComponent* TargetAbilitySystemComponent = ExecutionParams.GetTargetAbilitySystemComponent();
+    UAbilitySystemComponent* SourceAbilitySystemComponent = ExecutionParams.GetSourceAbilitySystemComponent();
 
-	AActor* SourceActor = SourceAbilitySystemComponent ? SourceAbilitySystemComponent->GetAvatarActor() : nullptr;
-	AActor* TargetActor = TargetAbilitySystemComponent ? TargetAbilitySystemComponent->GetAvatarActor() : nullptr;
+    AActor* SourceActor = SourceAbilitySystemComponent ? SourceAbilitySystemComponent->GetAvatarActor() : nullptr;
+    AActor* TargetActor = TargetAbilitySystemComponent ? TargetAbilitySystemComponent->GetAvatarActor() : nullptr;
 
-	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
+    const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
 
-	// Gather the tags from the source and target as that can affect which buffs should be used
-	const FGameplayTagContainer* SourceTags = Spec.CapturedSourceTags.GetAggregatedTags();
-	const FGameplayTagContainer* TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
+    // Gather the tags from the source and target as that can affect which buffs should be used
+    const FGameplayTagContainer* SourceTags = Spec.CapturedSourceTags.GetAggregatedTags();
+    const FGameplayTagContainer* TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
 
-	FAggregatorEvaluateParameters EvaluationParameters;
-	EvaluationParameters.SourceTags = SourceTags;
-	EvaluationParameters.TargetTags = TargetTags;
+    FAggregatorEvaluateParameters EvaluationParameters;
+    EvaluationParameters.SourceTags = SourceTags;
+    EvaluationParameters.TargetTags = TargetTags;
 
-	float Armor = 0.0f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ArmorDef, EvaluationParameters, Armor);
-	Armor = FMath::Max<float>(Armor, 0.0f);
+    float Armor = 0.0f;
+    ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ArmorDef, EvaluationParameters, Armor);
+    Armor = FMath::Max<float>(Armor, 0.0f);
 
-	float Damage = 0.0f;
-	// Capture optional damage value set on the damage GE as a CalculationModifier under the ExecutionCalculation
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().DamageDef, EvaluationParameters, Damage);
-	// Add SetByCaller damage if it exists
-	Damage += FMath::Max<float>(Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Damage")), false, -1.0f), 0.0f);
+    float Damage = 0.0f;
+    // Capture optional damage value set on the damage GE as a CalculationModifier under the ExecutionCalculation
+    ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().DamageDef, EvaluationParameters, Damage);
+    // Add SetByCaller damage if it exists
+    Damage += FMath::Max<float>(Spec.GetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(FName("Data.Damage")), false, -1.0f), 0.0f);
 
-	float UnmitigatedDamage = Damage; // Can multiply any damage boosters here
-	
-	float MitigatedDamage = (UnmitigatedDamage) * (100 / (100 + Armor));
+    float UnmitigatedDamage = Damage; // Can multiply any damage boosters here
 
-	if (MitigatedDamage > 0.f)
-	{
-		// Set the Target's damage meta attribute
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(DamageStatics().DamageProperty, EGameplayModOp::Additive, MitigatedDamage));
-	}
+    float MitigatedDamage = (UnmitigatedDamage) * (100 / (100 + Armor));
 
-	// Broadcast damages to Target ASC
-	UGDAbilitySystemComponent* TargetASC = Cast<UGDAbilitySystemComponent>(TargetAbilitySystemComponent);
-	if (TargetASC)
-	{
-		UGDAbilitySystemComponent* SourceASC = Cast<UGDAbilitySystemComponent>(SourceAbilitySystemComponent);
-		TargetASC->ReceiveDamage(SourceASC, UnmitigatedDamage, MitigatedDamage);
-	}
+    if (MitigatedDamage > 0.f)
+    {
+        // Set the Target's damage meta attribute
+        OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(DamageStatics().DamageProperty, EGameplayModOp::Additive, MitigatedDamage));
+    }
+
+    // Broadcast damages to Target ASC
+    UGDAbilitySystemComponent* TargetASC = Cast<UGDAbilitySystemComponent>(TargetAbilitySystemComponent);
+    if (TargetASC)
+    {
+        UGDAbilitySystemComponent* SourceASC = Cast<UGDAbilitySystemComponent>(SourceAbilitySystemComponent);
+        TargetASC->ReceiveDamage(SourceASC, UnmitigatedDamage, MitigatedDamage);
+    }
 }
 ```
 
@@ -89,3 +89,51 @@ void UGDDamageExecCalculation::Execute_Implementation(const FGameplayEffectCusto
 在InternalExecuteMod真正对Attribute进行修改时，会调用AttributeSet::PreGameplayEffectExecute和AttributeSet::PostGameplayEffectExecute。这两个函数都可以进行重写。在这个项目里，UGDAttributeSetBase重写了这两个方法，在UGDAttributeSetBase::PostGameplayEffectExecute函数里用生命值减去伤害值，到这里才是真正应用到了Damage的值来对角色造成伤害。
 
 ![代码](image/7.png)
+
+# HealthManaStaminaVolume
+
+![代码](image/HealthManaStaminaVolume.gif)
+
+进入碰撞盒内快速回复红蓝绿三属性
+
+## BP_HealthManaStaminaVolume
+
+![代码](image/8.png)
+
+与Damage先创建实例然后SetSetByCaller修改对应tag的Magintude不同，这里直接对角色应用GE。
+
+## GE_HealthManaStaminaVolume
+
+![代码](image/9.png)
+
+GE的效果一看就懂，配置了3个Modifier分别对3属性增加20，在蓝图里每一秒应用一次。
+
+# HealthManaStaminaRegenVolume
+
+![代码](image/10.png)
+
+进入碰撞盒内，3属性的每秒恢复增加20。
+
+## BP_HealthManaStaminaVolume
+
+![代码](image/11.png)
+
+对每个进入BOX的角色，Apply一个GE
+
+## GE_HealthManaStaminaRegenVolume
+
+![代码](image/12.png)
+
+这个GE的效果是一个永久的buff，3属性RegenRate增加20。
+
+## RegenRate是如何生效
+
+![代码](image/13.png)
+
+在Character的定义里有StartupEffects，会在游戏开始赋予角色GE。
+
+3属性的RangenRate分别都在这里在一开始赋予给角色。拿其中一个举例
+
+![代码](image/14.png)
+
+每1秒Heath加上HeathRangenRate的值。
